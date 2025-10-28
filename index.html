@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-R">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data String Splitter</title>
+    <!-- Favicon untuk tab browser -->
+    <link rel="icon" type="image/svg+xml" href="logo.svg">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .drag-over {
+            border-style: solid;
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <div class="max-w-3xl w-full bg-white rounded-lg shadow-xl p-6 md:p-8">
+        
+        <div class="flex items-center justify-start pb-4 mb-6 border-b border-gray-300 space-x-3">
+            <img src="cho.svg" alt="Logo" class="w-12 h-12">
+        </div>
+        <div class="text-center mb-8">
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">Pembagi Data String</h1>
+            <p class="text-gray-600">Unggah file, periksa data, dan bagi menjadi beberapa file berdasarkan jumlah baris yang ditentukan.</p>
+        </div>
+        <div class="space-y-6">
+            <div>
+                <label for="fileInput" class="block text-sm font-medium text-gray-700 mb-2">
+                    1. Upload file Anda (.js, .txt, .csv):
+                </label>
+                <div id="dropZone" class="flex flex-col items-center justify-center w-full p-6 border-2 border-dashed border-gray-300 rounded-md cursor-pointer transition-all duration-300 ease-in-out hover:bg-gray-50">
+                    <svg class="w-10 h-10 mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-4-4V6a4 4 0 014-4h10a4 4 0 014 4v6a4 4 0 01-4 4H7z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.344A4.002 4.002 0 0116 10v6a4 4 0 01-4 4H8a4 4 0 01-4-4v-6a4 4 0 014-4.002"></path></svg>
+                    <p class="mb-2 text-sm text-gray-500 text-center">
+                        <span class="font-semibold">Klik untuk memilih file</span> atau seret (drag) file ke sini
+                    </p>
+                    <p id="fileName" class="text-xs text-gray-500"></p>
+                </div>
+                <input type="file" id="fileInput" accept=".js,.txt,.csv" class="hidden"/>
+            </div>
+
+            <div>
+                <label for="dataInput" class="block text-sm font-medium text-gray-700 mb-2">
+                    2. Periksa data (atau tempel manual di sini):
+                </label>
+                <textarea id="dataInput" rows="15" class="w-full p-4 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm font-mono" placeholder="Data dari file yang di-upload akan muncul di sini..."></textarea>
+            </div>
+
+            <div>
+                <label for="chunkSize" class="block text-sm font-medium text-gray-700 mb-2">
+                    3. Masukkan jumlah baris per file:
+                </label>
+                <input type="number" id="chunkSize" value="5" min="1" class="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Contoh: 5">
+            </div>
+
+            <div>
+                <label for="fileNamePrefix" class="block text-sm font-medium text-gray-700 mb-2">
+                    4. Masukkan nama file (opsional):
+                </label>
+                <input type="text" id="fileNamePrefix" class="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Contoh: Data (akan menjadi Data1.js, Data2.js, ...)">
+            </div>
+
+            <button id="processButton" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-md shadow-lg transition duration-300 ease-in-out transform hover:-translate-y-0.5">
+                5. Bagi Data dan Buat File
+            </button>
+
+            <div id="outputArea" class="mt-6 border-t border-gray-200 pt-6">
+                <p class="text-gray-500 text-center">File yang akan diunduh akan muncul di sini.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const dataInput = document.getElementById('dataInput');
+            const chunkSizeInput = document.getElementById('chunkSize');
+            const processButton = document.getElementById('processButton');
+            const outputArea = document.getElementById('outputArea');
+            const fileInput = document.getElementById('fileInput');
+            const dropZone = document.getElementById('dropZone');
+            const fileNameDisplay = document.getElementById('fileName');
+            const fileNamePrefixInput = document.getElementById('fileNamePrefix');
+
+            dropZone.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            fileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    handleFile(file);
+                }
+            });
+
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('drag-over');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('drag-over');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('drag-over');
+                
+                const file = e.dataTransfer.files[0];
+                if (file) {
+                    handleFile(file);
+                }
+            });
+
+            function handleFile(file) {
+                if (!file) {
+                    return;
+                }
+
+                fileNameDisplay.textContent = file.name;
+                outputArea.innerHTML = `<p class="text-gray-500 text-center">Membaca file '${file.name}'...</p>`;
+                const reader = new FileReader();
+                
+                reader.onload = (e) => {
+                    const content = e.target.result;
+                    
+                    let cleanedContent = content;
+                    const match = content.match(/const\s+dataString\s*=\s*`([\s\S]*)`;/);
+                    
+                    if (match && match[1]) {
+                        cleanedContent = match[1].trim();
+                    } else {
+                        cleanedContent = content.trim();
+                    }
+
+                    dataInput.value = cleanedContent;
+                    outputArea.innerHTML = `<p class="text-green-600 text-center font-semibold">File '${file.name}' berhasil dimuat. Silakan periksa data dan klik proses.</p>`;
+                };
+                
+                reader.onerror = (e) => {
+                    console.error("Gagal membaca file:", e);
+                    outputArea.innerHTML = '<p class="text-red-600 text-center font-semibold">Gagal membaca file.</p>';
+                };
+                
+                reader.readAsText(file);
+            }
+
+            processButton.addEventListener('click', () => {
+                const fullDataString = dataInput.value.trim();
+                const chunkSize = parseInt(chunkSizeInput.value, 10);
+                const prefix = fileNamePrefixInput.value.trim();
+
+                outputArea.innerHTML = '';
+
+                if (!fullDataString) {
+                    outputArea.innerHTML = '<p class="text-red-600 text-center font-semibold">Area data string tidak boleh kosong.</p>';
+                    return;
+                }
+                if (isNaN(chunkSize) || chunkSize <= 0) {
+                    outputArea.innerHTML = '<p class="text-red-600 text-center font-semibold">Jumlah baris per file harus angka lebih besar dari 0.</p>';
+                    return;
+                }
+
+                const lines = fullDataString.split('\n').filter(line => line.trim() !== '');
+
+                if (lines.length === 0) {
+                    outputArea.innerHTML = '<p class="text-red-600 text-center font-semibold">Tidak ada data yang valid untuk diproses.</p>';
+                    return;
+                }
+
+                let fileCounter = 1;
+                for (let i = 0; i < lines.length; i += chunkSize) {
+                    const chunk = lines.slice(i, i + chunkSize);
+                    const fileContent = `const dataString = \`\n${chunk.join('\n')}\n\`;`;
+                    
+                    const baseName = prefix === '' ? 'data_part_' : prefix;
+                    const fileName = `${baseName}${fileCounter}.js`;
+
+                    createDownloadLink(fileContent, fileName);
+                    fileCounter++;
+                }
+            });
+
+            function createDownloadLink(content, filename) {
+                const a = document.createElement('a');
+                a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(content);
+                a.download = filename;
+                a.textContent = `Unduh ${filename} (${content.split('\n').length - 2} baris)`;
+                a.className = 'block w-full text-center bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-md shadow-sm transition duration-300 mb-3 cursor-pointer';
+                outputArea.appendChild(a);
+            }
+        });
+    </script>
+
+</body>
+</html>
+
