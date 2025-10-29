@@ -3,10 +3,12 @@
 <head>
     <meta charset="UTF-R">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Data String Splitter</title>
+    <title>Pembagi Data String</title>
     <!-- Favicon untuk tab browser -->
     <link rel="icon" type="image/svg+xml" href="logo.svg">
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tambahkan library JSZip untuk membuat file zip -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -22,8 +24,8 @@
 
     <div class="max-w-3xl w-full bg-white rounded-lg shadow-xl p-6 md:p-8">
         
-        <div class="flex items-center justify-start pb-4 mb-6 border-b border-gray-300 space-x-3">
-            <img src="cho.svg" alt="Logo" class="w-12 h-12">
+        <div class="flex items-center justify-start pb-4 mb-6 border-b border-gray-200 space-x-3">
+            <img src="cho.svg" alt="Logo" class="w-13 h-11">
         </div>
         <div class="text-center mb-8">
             <h1 class="text-2xl font-bold text-gray-800 mb-2">Pembagi Data String</h1>
@@ -172,7 +174,16 @@
                     return;
                 }
 
+                const zip = new JSZip();
                 let fileCounter = 1;
+                let totalFiles = 0;
+
+                // Judul untuk unduhan satuan
+                const individualTitle = document.createElement('p');
+                individualTitle.textContent = 'Unduh Satuan:';
+                individualTitle.className = 'text-sm font-semibold text-gray-600 mb-3';
+                outputArea.appendChild(individualTitle);
+
                 for (let i = 0; i < lines.length; i += chunkSize) {
                     const chunk = lines.slice(i, i + chunkSize);
                     const fileContent = `const dataString = \`\n${chunk.join('\n')}\n\`;`;
@@ -180,18 +191,80 @@
                     const baseName = prefix === '' ? 'data_part_' : prefix;
                     const fileName = `${baseName}${fileCounter}.js`;
 
+                    // 1. Tambahkan file ke dalam zip
+                    zip.file(fileName, fileContent);
+                    
+                    // 2. Buat link unduhan individual
                     createDownloadLink(fileContent, fileName);
+
                     fileCounter++;
+                    totalFiles++;
+                }
+
+                // 3. Buat link unduhan untuk file ZIP setelah loop selesai
+                if (totalFiles > 0) {
+                    // Pemisah
+                    const divider = document.createElement('hr');
+                    divider.className = 'my-5 border-t-2 border-gray-200';
+                    outputArea.appendChild(divider);
+
+                    // Judul untuk unduhan zip
+                    const zipTitle = document.createElement('p');
+                    zipTitle.textContent = 'Unduh Semua (ZIP):';
+                    zipTitle.className = 'text-sm font-semibold text-gray-600 mb-3';
+                    outputArea.appendChild(zipTitle);
+                    
+                    const zipFileName = (prefix === '' ? 'data_parts' : prefix) + '.zip';
+                    createZipDownloadLink(zip, zipFileName, totalFiles);
                 }
             });
 
+            /**
+             * [FUNGSI BARU DITAMBAHKAN KEMBALI]
+             * Membuat elemen <a> untuk mengunduh file individual.
+             * @param {string} content - Konten file.
+             * @param {string} filename - Nama file.
+             */
             function createDownloadLink(content, filename) {
                 const a = document.createElement('a');
                 a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(content);
                 a.download = filename;
                 a.textContent = `Unduh ${filename} (${content.split('\n').length - 2} baris)`;
-                a.className = 'block w-full text-center bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-md shadow-sm transition duration-300 mb-3 cursor-pointer';
+                // Menggunakan warna abu-abu untuk unduhan satuan
+                a.className = 'block w-full text-center bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-3 px-4 rounded-md shadow-sm transition duration-300 mb-3 cursor-pointer';
                 outputArea.appendChild(a);
+            }
+
+            /**
+             * Membuat elemen <a> untuk mengunduh file ZIP yang sudah digenerasi.
+             * @param {JSZip} zip - Objek JSZip yang berisi semua file.
+             * @param {string} zipFileName - Nama file untuk file zip.
+             * @param {number} totalFiles - Jumlah file di dalam zip.
+             */
+            function createZipDownloadLink(zip, zipFileName, totalFiles) {
+                const p = document.createElement('p');
+                p.textContent = 'Membuat file ZIP, mohon tunggu...';
+                p.className = 'text-gray-700 text-center font-semibold mb-3';
+                outputArea.appendChild(p);
+
+                zip.generateAsync({ type: "blob" })
+                    .then(function(content) {
+                        p.remove(); // Hapus pesan "mohon tunggu"
+
+                        const a = document.createElement('a');
+                        a.href = URL.createObjectURL(content);
+                        a.download = zipFileName;
+                        a.textContent = `Unduh ${zipFileName} (${totalFiles} file di dalamnya)`;
+                        // Menggunakan warna hijau untuk unduhan ZIP
+                        a.className = 'block w-full text-center bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-md shadow-lg transition duration-300 mb-3 cursor-pointer transform hover:-translate-y-0.5';
+                        
+                        outputArea.appendChild(a);
+                    })
+                    .catch(err => {
+                        console.error("Gagal membuat zip:", err);
+                        p.textContent = 'Gagal membuat file ZIP.';
+                        p.className = 'text-red-600 text-center font-semibold mb-3';
+                    });
             }
         });
     </script>
