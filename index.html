@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-R">
+    <meta charset="UTF-8"> <!-- Perbaikan: Mengganti UTF-R menjadi UTF-8 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pembagi Data String</title>
     <!-- Favicon untuk tab browser -->
-    <link rel="icon" type="image/svg+xml" href="logo.svg">
+    <link rel="icon" type="image/svg+xml" href="cho.svg">
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Tambahkan library JSZip untuk membuat file zip -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -51,13 +51,17 @@
                     2. Periksa data (atau tempel manual di sini):
                 </label>
                 <textarea id="dataInput" rows="15" class="w-full p-4 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm font-mono" placeholder="Data dari file yang di-upload akan muncul di sini..."></textarea>
+                <!-- Teks bantuan baru -->
+                <p class="text-xs text-gray-500 mt-2">
+                    Tips: Pisahkan manual dengan <code class="font-mono bg-gray-200 px-1 py-0.5 rounded">[=]</code> (Shortcut: <code class="font-mono bg-gray-200 px-1 py-0.5 rounded">Ctrl + G</code>).
+                </p>
             </div>
 
             <div>
                 <label for="chunkSize" class="block text-sm font-medium text-gray-700 mb-2">
                     3. Masukkan jumlah baris per file:
                 </label>
-                <input type="number" id="chunkSize" value="5" min="1" class="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Contoh: 5">
+                <input type="number" id="chunkSize" value="5" min="1" class="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Contoh: 5 (Diabaikan jika Anda memakai [=])">
             </div>
 
             <div>
@@ -87,6 +91,29 @@
             const dropZone = document.getElementById('dropZone');
             const fileNameDisplay = document.getElementById('fileName');
             const fileNamePrefixInput = document.getElementById('fileNamePrefix');
+
+            // --- Fitur Baru: Ctrl + G untuk [=] ---
+            dataInput.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.key === 'g') {
+                    // 1. Mencegah fungsi default browser (seperti 'Find')
+                    e.preventDefault();
+
+                    // 2. Dapatkan posisi kursor
+                    const start = dataInput.selectionStart;
+                    const end = dataInput.selectionEnd;
+                    const textToInsert = '[=]';
+                    const currentValue = dataInput.value;
+
+                    // 3. Masukkan teks [=] di posisi kursor
+                    dataInput.value = currentValue.substring(0, start) + textToInsert + currentValue.substring(end);
+
+                    // 4. Pindahkan kursor ke setelah teks yang dimasukkan
+                    const newCursorPos = start + textToInsert.length;
+                    dataInput.selectionStart = newCursorPos;
+                    dataInput.selectionEnd = newCursorPos;
+                }
+            });
+            // --- Akhir Fitur Baru ---
 
             dropZone.addEventListener('click', () => {
                 fileInput.click();
@@ -162,17 +189,47 @@
                     outputArea.innerHTML = '<p class="text-red-600 text-center font-semibold">Area data string tidak boleh kosong.</p>';
                     return;
                 }
-                if (isNaN(chunkSize) || chunkSize <= 0) {
-                    outputArea.innerHTML = '<p class="text-red-600 text-center font-semibold">Jumlah baris per file harus angka lebih besar dari 0.</p>';
+
+                let chunks = []; // Ini akan menampung array dari array baris (string[][])
+
+                // Logika baru: Cek apakah pemisah manual [=] digunakan
+                if (fullDataString.includes('[=]')) {
+                    const manualChunks = fullDataString.split('[=]');
+                    for (const rawChunk of manualChunks) {
+                        const trimmedChunk = rawChunk.trim();
+                        if (trimmedChunk) {
+                            const lines = trimmedChunk.split('\n').filter(line => line.trim() !== '');
+                            if (lines.length > 0) {
+                                chunks.push(lines);
+                            }
+                        }
+                    }
+                } else {
+                    // Logika lama (fallback): Gunakan chunkSize
+                    if (isNaN(chunkSize) || chunkSize <= 0) {
+                        outputArea.innerHTML = '<p class="text-red-600 text-center font-semibold">Jumlah baris per file harus angka lebih besar dari 0.</p>';
+                        return;
+                    }
+
+                    const lines = fullDataString.split('\n').filter(line => line.trim() !== '');
+                    if (lines.length === 0) {
+                        outputArea.innerHTML = '<p class="text-red-600 text-center font-semibold">Tidak ada data yang valid untuk diproses.</p>';
+                        return;
+                    }
+
+                    for (let i = 0; i < lines.length; i += chunkSize) {
+                        const chunkLines = lines.slice(i, i + chunkSize);
+                        chunks.push(chunkLines);
+                    }
+                }
+
+                // --- Loop Pemrosesan Terpadu ---
+                // Cek apakah ada chunk yang dihasilkan (dari salah satu metode)
+                if (chunks.length === 0) {
+                    outputArea.innerHTML = '<p class="text-red-600 text-center font-semibold">Tidak ada data yang valid untuk diproses setelah pemisahan.</p>';
                     return;
                 }
 
-                const lines = fullDataString.split('\n').filter(line => line.trim() !== '');
-
-                if (lines.length === 0) {
-                    outputArea.innerHTML = '<p class="text-red-600 text-center font-semibold">Tidak ada data yang valid untuk diproses.</p>';
-                    return;
-                }
 
                 const zip = new JSZip();
                 let fileCounter = 1;
@@ -184,8 +241,8 @@
                 individualTitle.className = 'text-sm font-semibold text-gray-600 mb-3';
                 outputArea.appendChild(individualTitle);
 
-                for (let i = 0; i < lines.length; i += chunkSize) {
-                    const chunk = lines.slice(i, i + chunkSize);
+                // Loop melalui array 'chunks' yang sudah disiapkan
+                for (const chunk of chunks) { // 'chunk' di sini adalah array baris (string[])
                     const fileContent = `const dataString = \`\n${chunk.join('\n')}\n\`;`;
                     
                     const baseName = prefix === '' ? 'data_part_' : prefix;
@@ -195,7 +252,8 @@
                     zip.file(fileName, fileContent);
                     
                     // 2. Buat link unduhan individual
-                    createDownloadLink(fileContent, fileName);
+                    const lineCount = chunk.length; 
+                    createDownloadLink(fileContent, fileName, lineCount);
 
                     fileCounter++;
                     totalFiles++;
@@ -224,12 +282,14 @@
              * Membuat elemen <a> untuk mengunduh file individual.
              * @param {string} content - Konten file.
              * @param {string} filename - Nama file.
+             * @param {number} lineCount - Jumlah baris data yang sebenarnya.
              */
-            function createDownloadLink(content, filename) {
+            function createDownloadLink(content, filename, lineCount) {
                 const a = document.createElement('a');
                 a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(content);
                 a.download = filename;
-                a.textContent = `Unduh ${filename} (${content.split('\n').length - 2} baris)`;
+                // Gunakan lineCount yang sudah dihitung sebelumnya
+                a.textContent = `Unduh ${filename} (${lineCount} baris)`;
                 // Menggunakan warna abu-abu untuk unduhan satuan
                 a.className = 'block w-full text-center bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-3 px-4 rounded-md shadow-sm transition duration-300 mb-3 cursor-pointer';
                 outputArea.appendChild(a);
@@ -271,4 +331,3 @@
 
 </body>
 </html>
-
